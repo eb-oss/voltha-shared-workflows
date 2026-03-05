@@ -9,29 +9,29 @@ on:
   push:
     branches:
       - master
-      - 'voltha-*'
+      - "voltha-*"
 
   # Run on pull requests
   pull_request:
     branches:
       - master
-      - 'voltha-*'
+      - "voltha-*"
 
   # Allow manual triggering with custom parameters
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to test'
+        description: "Branch to test"
         required: true
-        default: 'master'
+        default: "master"
         type: choice
         options:
           - master
           - voltha-2.15
       workflow_type:
-        description: 'Workflow to test'
+        description: "Workflow to test"
         required: true
-        default: 'all'
+        default: "all"
         type: choice
         options:
           - all
@@ -39,9 +39,9 @@ on:
           - att
           - tt
       log_level:
-        description: 'Log level'
+        description: "Log level"
         required: false
-        default: 'WARN'
+        default: "WARN"
         type: choice
         options:
           - DEBUG
@@ -49,14 +49,14 @@ on:
           - WARN
           - ERROR
       with_monitoring:
-        description: 'Enable monitoring'
+        description: "Enable monitoring"
         required: false
         default: false
         type: boolean
 
   # Run nightly
   schedule:
-    - cron: '0 2 * * *'  # 2 AM UTC daily
+    - cron: "0 2 * * *" # 2 AM UTC daily
 
 jobs:
   # -----------------------------------------------------------------------
@@ -74,11 +74,6 @@ jobs:
       github.event_name == 'pull_request'
 
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          path: shared-workflows
-
       - name: Free up disk space
         run: |
           echo "Disk space before cleanup:"
@@ -94,7 +89,7 @@ jobs:
           df -h
 
       - name: Run DT BBSim Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
           log-level: ${{ github.event.inputs.log_level || 'WARN' }}
@@ -128,11 +123,6 @@ jobs:
        (github.event.inputs.workflow_type == 'att' || github.event.inputs.workflow_type == 'all'))
 
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          path: shared-workflows
-
       - name: Free up disk space
         run: |
           echo "Disk space before cleanup:"
@@ -147,7 +137,7 @@ jobs:
           df -h
 
       - name: Run ATT BBSim Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
           log-level: ${{ github.event.inputs.log_level || 'WARN' }}
@@ -181,11 +171,6 @@ jobs:
        (github.event.inputs.workflow_type == 'tt' || github.event.inputs.workflow_type == 'all'))
 
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          path: shared-workflows
-
       - name: Free up disk space
         run: |
           echo "Disk space before cleanup:"
@@ -200,7 +185,7 @@ jobs:
           df -h
 
       - name: Run TT BBSim Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
           log-level: ${{ github.event.inputs.log_level || 'WARN' }}
@@ -231,11 +216,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.workflow_type == 'all'
 
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          path: shared-workflows
-
       - name: Free up disk space
         run: |
           echo "Disk space before cleanup:"
@@ -250,7 +230,7 @@ jobs:
           df -h
 
       - name: Run All Workflow Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
           log-level: ${{ github.event.inputs.log_level || 'INFO' }}
@@ -304,11 +284,6 @@ jobs:
       github.event.inputs.gerrit_refspec != ''
 
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          path: shared-workflows
-
       - name: Free up disk space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -317,7 +292,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Test Patch with BBSim
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
           gerrit-project: ${{ github.event.inputs.gerrit_project }}

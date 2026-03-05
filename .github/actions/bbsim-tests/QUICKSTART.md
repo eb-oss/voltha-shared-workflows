@@ -5,8 +5,8 @@ This guide will help you get started with the BBSim Tests GitHub Action in under
 ## Prerequisites
 
 - A GitHub repository with GitHub Actions enabled
-- Access to the `shared-workflows` repository containing this action
 - Basic understanding of VOLTHA and BBSim
+- Sufficient runner resources (minimum 8GB RAM, 2 CPUs)
 
 ## Minimal Example
 
@@ -23,14 +23,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          repository: opencord/shared-workflows
-          path: shared-workflows
-
       - name: Run BBSim Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: master
           test-targets: |
@@ -43,6 +37,8 @@ jobs:
 ```
 
 That's it! Commit and push this file to trigger your first BBSim test.
+
+**Note**: This action is designed as a **shared/reusable action**. You don't need to check out the `shared-workflows` repository - just reference it directly with `uses:`. All dependencies and scripts are handled automatically.
 
 ## What This Does
 
@@ -120,7 +116,7 @@ Set `log-level` to `DEBUG`:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: ./shared-workflows/.github/actions/bbsim-tests
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
   with:
     branch: master
     log-level: DEBUG
@@ -134,7 +130,7 @@ Add `with-monitoring: true` to collect memory consumption metrics:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: ./shared-workflows/.github/actions/bbsim-tests
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
   with:
     branch: master
     with-monitoring: true
@@ -148,7 +144,7 @@ Set the `olts` parameter:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: ./shared-workflows/.github/actions/bbsim-tests
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
   with:
     branch: master
     olts: "2"
@@ -195,12 +191,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: opencord/shared-workflows
-          path: shared-workflows
-
-      - uses: ./shared-workflows/.github/actions/bbsim-tests
+      - name: Run BBSim Tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: ${{ inputs.branch }}
           log-level: ${{ inputs.log_level }}
@@ -257,6 +249,24 @@ jobs:
 3. Review [CONVERSION-NOTES.md](CONVERSION-NOTES.md) for technical details
 4. Check GitHub Actions logs for specific error messages
 
+## Important Notes
+
+### External Usage
+This action is designed to be called from external repositories. You don't need to:
+- ❌ Check out the `shared-workflows` repository
+- ❌ Copy any script files
+- ❌ Install dependencies manually
+
+The action is **fully self-contained** and handles everything automatically.
+
+### Version Pinning
+For production use, pin to a specific version:
+```yaml
+uses: opencord/shared-workflows/.github/actions/bbsim-tests@v1.0.0  # Recommended
+uses: opencord/shared-workflows/.github/actions/bbsim-tests@abc123  # Most secure
+uses: opencord/shared-workflows/.github/actions/bbsim-tests@master  # Development only
+```
+
 ## Next Steps
 
 - **Customize**: Adjust parameters for your specific needs
@@ -264,6 +274,7 @@ jobs:
 - **Integrate**: Add to PR workflows for automated testing
 - **Monitor**: Enable monitoring to track resource usage
 - **Optimize**: Adjust timeouts and resource limits
+- **Read**: Check [EXTERNAL-USAGE.md](EXTERNAL-USAGE.md) for detailed information
 
 ## Full Example with All Options
 
@@ -291,14 +302,8 @@ jobs:
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       
-      - name: Checkout shared-workflows
-        uses: actions/checkout@v4
-        with:
-          repository: opencord/shared-workflows
-          path: shared-workflows
-      
       - name: Run BBSim Tests
-        uses: ./shared-workflows/.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: master
           log-level: INFO

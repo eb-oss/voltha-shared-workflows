@@ -2,6 +2,10 @@
 
 This action runs VOLTHA end-to-end tests using BBSim (Broadband Simulator) to simulate OLT/ONU devices. It's a conversion of the Jenkins pipeline from `ci-management/jjb/pipeline/voltha/bbsim-tests.groovy` to GitHub Actions.
 
+## Important Note
+
+This action is designed to be used as a **shared/reusable action** from external repositories. All test execution logic is embedded directly in the `action.yaml` file (no external script dependencies), making it compatible with GitHub Actions' composite action model when called from other repositories.
+
 ## Overview
 
 The action performs the following steps:
@@ -71,7 +75,9 @@ The `test-targets` input should be a YAML array with the following structure:
 
 ## Usage Examples
 
-### Basic Usage
+### Basic Usage (from External Repository)
+
+This is the most common usage pattern - calling the action from another repository:
 
 ```yaml
 name: BBSim Tests
@@ -86,7 +92,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run BBSim Tests
-        uses: ./.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+        with:
+          branch: master
+          test-targets: |
+            - target: functional-single-kind-dt
+              workflow: dt
+              flags: ""
+              teardown: true
+              logging: true
+              vgcEnabled: false
+```
+
+**Note**: Replace `@master` with a specific version tag or commit SHA for production use.
+
+### Usage from Local Repository
+
+If you're developing or testing the action within the `shared-workflows` repository itself:
+
+```yaml
+jobs:
+  bbsim-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run BBSim Tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: master
           test-targets: |
@@ -173,7 +203,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run BBSim Tests with Patch
-        uses: ./.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: master
           gerrit-project: ${{ inputs.gerrit_project }}
@@ -202,7 +232,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run BBSim Tests
-        uses: ./.github/actions/bbsim-tests
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: master
           voltha-system-tests-change: "refs/changes/12/34512/1"
@@ -214,6 +244,20 @@ jobs:
               logging: true
               vgcEnabled: false
 ```
+
+## How It Works
+
+This action is implemented as a **composite action** with all logic embedded directly in the `action.yaml` file. When called from an external repository:
+
+1. The test execution script is created dynamically at runtime in `/tmp/execute_test.sh`
+2. No local file paths or relative references are needed
+3. All dependencies are installed fresh in each run
+4. The action is fully self-contained and portable
+
+This design ensures the action works correctly whether called from:
+- External repositories (most common use case)
+- The shared-workflows repository itself (for development/testing)
+- Forked repositories
 
 ## Dependencies
 
