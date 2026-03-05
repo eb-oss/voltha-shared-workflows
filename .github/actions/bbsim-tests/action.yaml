@@ -178,7 +178,6 @@ runs:
           chmod +x "$GITHUB_WORKSPACE/bin/kail"
           rm /tmp/kail.tar.gz
         fi
-        kail --version
 
     # -----------------------------------------------------------------------
     # Install voltctl
