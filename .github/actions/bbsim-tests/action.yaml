@@ -1,0 +1,498 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Open Networking Foundation Contributors
+
+name: "bbsim-tests"
+description: "VOLTHA BBSim E2E Tests - Simulates OLT/ONUs using bbsim and runs robot framework tests"
+
+inputs:
+  branch:
+    description: "Branch to test (master, voltha-2.15, etc.)"
+    required: true
+    type: string
+  test-targets:
+    description: "YAML string defining test targets to run"
+    required: true
+    type: string
+  gerrit-project:
+    description: "Gerrit project name if building a patch"
+    required: false
+    type: string
+    default: ""
+  gerrit-refspec:
+    description: "Gerrit refspec if building a patch"
+    required: false
+    type: string
+    default: ""
+  voltha-system-tests-change:
+    description: "Gerrit change number for voltha-system-tests"
+    required: false
+    type: string
+    default: ""
+  voltha-helm-charts-change:
+    description: "Gerrit change number for voltha-helm-charts"
+    required: false
+    type: string
+    default: ""
+  extra-helm-flags:
+    description: "Additional Helm flags for deployment"
+    required: false
+    type: string
+    default: ""
+  log-level:
+    description: "Log level for VOLTHA components (DEBUG, INFO, WARN, ERROR)"
+    required: false
+    type: string
+    default: "WARN"
+  timeout:
+    description: "Timeout in minutes for the entire action"
+    required: false
+    type: string
+    default: "240"
+  cluster-name:
+    description: "Name of the kind cluster"
+    required: false
+    type: string
+    default: "kind-ci"
+  docker-registry:
+    description: "Docker registry to use"
+    required: false
+    type: string
+    default: "mirror.registry.opennetworking.org"
+  olts:
+    description: "Number of OLTs to simulate"
+    required: false
+    type: string
+    default: "1"
+  with-monitoring:
+    description: "Enable monitoring with prometheus"
+    required: false
+    type: boolean
+    default: false
+  enable-mac-learning:
+    description: "Enable MAC learning in VOLTHA"
+    required: false
+    type: boolean
+    default: false
+  extra-robot-args:
+    description: "Additional arguments for Robot Framework"
+    required: false
+    type: string
+    default: ""
+
+outputs:
+  test-results:
+    description: "Path to test results"
+    value: ${{ steps.test-execution.outputs.results-path }}
+
+runs:
+  using: "composite"
+  steps:
+    # -----------------------------------------------------------------------
+    # Setup environment variables
+    # -----------------------------------------------------------------------
+    - name: Setup environment
+      shell: bash
+      run: |
+        echo "KUBECONFIG=$HOME/.kube/kind-${{ inputs.cluster-name }}" >> $GITHUB_ENV
+        echo "VOLTCONFIG=$HOME/.volt/config" >> $GITHUB_ENV
+        echo "PATH=$PATH:$GITHUB_WORKSPACE/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> $GITHUB_ENV
+        echo "DIAGS_PROFILE=VOLTHA_PROFILE" >> $GITHUB_ENV
+        echo "SSHPASS=karaf" >> $GITHUB_ENV
+        mkdir -p $GITHUB_WORKSPACE/bin
+
+    # -----------------------------------------------------------------------
+    # Install dependencies
+    # -----------------------------------------------------------------------
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        echo "Installing system dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y \
+          curl \
+          wget \
+          git \
+          make \
+          jq \
+          sshpass \
+          python3 \
+          python3-pip \
+          python3-venv \
+          rsync
+
+    # -----------------------------------------------------------------------
+    # Install kubectl
+    # -----------------------------------------------------------------------
+    - name: Install kubectl
+      shell: bash
+      run: |
+        echo "Installing kubectl..."
+        if [ ! -f "$GITHUB_WORKSPACE/bin/kubectl" ]; then
+          KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+          curl -Lo "$GITHUB_WORKSPACE/bin/kubectl" \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x "$GITHUB_WORKSPACE/bin/kubectl"
+        fi
+        kubectl version --client
+
+    # -----------------------------------------------------------------------
+    # Install Helm
+    # -----------------------------------------------------------------------
+    - name: Install Helm
+      shell: bash
+      run: |
+        echo "Installing Helm..."
+        if ! command -v helm &> /dev/null; then
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        fi
+        helm version
+
+    # -----------------------------------------------------------------------
+    # Install kind
+    # -----------------------------------------------------------------------
+    - name: Install kind
+      shell: bash
+      run: |
+        echo "Installing kind..."
+        if [ ! -f "$GITHUB_WORKSPACE/bin/kind" ]; then
+          KIND_VERSION="v0.20.0"
+          curl -Lo "$GITHUB_WORKSPACE/bin/kind" \
+            "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x "$GITHUB_WORKSPACE/bin/kind"
+        fi
+        kind version
+
+    # -----------------------------------------------------------------------
+    # Install kail
+    # -----------------------------------------------------------------------
+    - name: Install kail
+      shell: bash
+      run: |
+        echo "Installing kail..."
+        if [ ! -f "$GITHUB_WORKSPACE/bin/kail" ]; then
+          KAIL_VERSION="v0.17.4"
+          wget -O /tmp/kail.tar.gz \
+            "https://github.com/boz/kail/releases/download/${KAIL_VERSION}/kail_${KAIL_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/kail.tar.gz -C "$GITHUB_WORKSPACE/bin" kail
+          chmod +x "$GITHUB_WORKSPACE/bin/kail"
+          rm /tmp/kail.tar.gz
+        fi
+        kail --version
+
+    # -----------------------------------------------------------------------
+    # Install voltctl
+    # -----------------------------------------------------------------------
+    - name: Install voltctl
+      shell: bash
+      run: |
+        echo "Installing voltctl..."
+        if [ "${{ inputs.gerrit-project }}" != "voltctl" ]; then
+          if [ ! -f "$GITHUB_WORKSPACE/bin/voltctl" ]; then
+            VOLTCTL_VERSION="1.8.45"
+            curl -Lo "$GITHUB_WORKSPACE/bin/voltctl" \
+              "https://github.com/opencord/voltctl/releases/download/v${VOLTCTL_VERSION}/voltctl-${VOLTCTL_VERSION}-linux-amd64"
+            chmod +x "$GITHUB_WORKSPACE/bin/voltctl"
+          fi
+        fi
+
+    # -----------------------------------------------------------------------
+    # Checkout VOLTHA repositories
+    # -----------------------------------------------------------------------
+    - name: Checkout voltha-system-tests
+      uses: actions/checkout@v4
+      with:
+        repository: opencord/voltha-system-tests
+        ref: ${{ inputs.branch }}
+        path: voltha-system-tests
+
+    - name: Apply voltha-system-tests patch
+      if: inputs.voltha-system-tests-change != ''
+      shell: bash
+      working-directory: voltha-system-tests
+      run: |
+        echo "Applying voltha-system-tests change ${{ inputs.voltha-system-tests-change }}"
+        git fetch https://gerrit.lfbroadband.org/voltha-system-tests \
+          refs/changes/${{ inputs.voltha-system-tests-change }}
+        git checkout FETCH_HEAD
+
+    - name: Checkout voltha-helm-charts
+      uses: actions/checkout@v4
+      with:
+        repository: opencord/voltha-helm-charts
+        ref: ${{ inputs.branch }}
+        path: voltha-helm-charts
+
+    - name: Apply voltha-helm-charts patch
+      if: inputs.voltha-helm-charts-change != ''
+      shell: bash
+      working-directory: voltha-helm-charts
+      run: |
+        echo "Applying voltha-helm-charts change ${{ inputs.voltha-helm-charts-change }}"
+        git fetch https://gerrit.lfbroadband.org/voltha-helm-charts \
+          refs/changes/${{ inputs.voltha-helm-charts-change }}
+        git checkout FETCH_HEAD
+
+    # -----------------------------------------------------------------------
+    # Checkout and build gerrit project if specified
+    # -----------------------------------------------------------------------
+    - name: Checkout gerrit project
+      if: inputs.gerrit-project != ''
+      uses: actions/checkout@v4
+      with:
+        repository: opencord/${{ inputs.gerrit-project }}
+        ref: ${{ inputs.gerrit-refspec }}
+        path: ${{ inputs.gerrit-project }}
+
+    - name: Build gerrit project
+      if: inputs.gerrit-project != ''
+      shell: bash
+      working-directory: ${{ inputs.gerrit-project }}
+      run: |
+        echo "Building ${{ inputs.gerrit-project }}..."
+        if [ -f "Makefile" ]; then
+          make docker-build
+        fi
+
+    - name: Build and install voltctl from source
+      if: inputs.gerrit-project == 'voltctl'
+      shell: bash
+      working-directory: voltctl
+      run: |
+        echo "Building voltctl from source..."
+        make build
+        cp voltctl "$GITHUB_WORKSPACE/bin/"
+        chmod +x "$GITHUB_WORKSPACE/bin/voltctl"
+
+    # -----------------------------------------------------------------------
+    # Create kind cluster
+    # -----------------------------------------------------------------------
+    - name: Check if kind cluster exists
+      id: cluster-check
+      shell: bash
+      run: |
+        if kind get clusters | grep -q "^${{ inputs.cluster-name }}$"; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create kind cluster
+      if: steps.cluster-check.outputs.exists == 'false'
+      shell: bash
+      run: |
+        echo "Creating kind cluster ${{ inputs.cluster-name }}..."
+        cat <<EOF > /tmp/kind-config.yaml
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        nodes:
+          - role: control-plane
+          - role: worker
+          - role: worker
+        EOF
+
+        kind create cluster --name ${{ inputs.cluster-name }} --config /tmp/kind-config.yaml
+
+        # Configure kubeconfig
+        mkdir -p $HOME/.kube
+        kind export kubeconfig --name ${{ inputs.cluster-name }} --kubeconfig $HOME/.kube/kind-${{ inputs.cluster-name }}
+
+        # Wait for cluster to be ready
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+    # -----------------------------------------------------------------------
+    # Load images to kind if building a component
+    # -----------------------------------------------------------------------
+    - name: Load images to kind
+      if: inputs.gerrit-project != '' && inputs.gerrit-project != 'voltctl'
+      shell: bash
+      run: |
+        echo "Loading images to kind cluster..."
+        PROJECT="${{ inputs.gerrit-project }}"
+        IMAGE_NAME="${PROJECT//-/_}"
+
+        # Find the built image
+        IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "voltha/${PROJECT}|opencord/${PROJECT}" | head -1)
+
+        if [ -n "$IMAGE" ]; then
+          echo "Loading image: $IMAGE"
+          kind load docker-image "$IMAGE" --name ${{ inputs.cluster-name }}
+        else
+          echo "Warning: No image found for project $PROJECT"
+        fi
+
+    # -----------------------------------------------------------------------
+    # Setup Helm repositories
+    # -----------------------------------------------------------------------
+    - name: Setup Helm repositories
+      shell: bash
+      run: |
+        echo "Adding Helm repositories..."
+        helm repo add onf https://charts.lfbroadband.org
+        helm repo add cord https://charts.lfbroadband.org
+        helm repo update
+
+    # -----------------------------------------------------------------------
+    # Run tests
+    # -----------------------------------------------------------------------
+    - name: Install PyYAML for test parsing
+      shell: bash
+      run: |
+        pip3 install pyyaml
+
+    - name: Execute tests
+      id: test-execution
+      shell: bash
+      run: |
+        echo "Executing tests..."
+
+        # Create logs directory
+        mkdir -p $GITHUB_WORKSPACE/logs
+        echo "results-path=$GITHUB_WORKSPACE/logs" >> $GITHUB_OUTPUT
+
+        # Parse test targets from YAML
+        cat > /tmp/test-targets.yaml <<'EOF'
+        ${{ inputs.test-targets }}
+        EOF
+
+        # Get the action directory
+        ACTION_DIR="${{ github.action_path }}"
+
+        # Run each test target
+        python3 - <<'PYTHON_SCRIPT'
+        import yaml
+        import subprocess
+        import os
+        import sys
+
+        with open('/tmp/test-targets.yaml', 'r') as f:
+            tests = yaml.safe_load(f)
+
+        if not tests:
+            print("No tests defined")
+            sys.exit(0)
+
+        workspace = os.environ['GITHUB_WORKSPACE']
+        action_dir = os.environ.get('ACTION_DIR', f"{workspace}/.github/actions/bbsim-tests")
+
+        test_failures = []
+
+        for idx, test in enumerate(tests):
+            target = test.get('target', '')
+            workflow = test.get('workflow', '')
+            flags = test.get('flags', '')
+            teardown = test.get('teardown', True)
+            logging = test.get('logging', True)
+            vgc_enabled = test.get('vgcEnabled', False)
+
+            print(f"\n** -----------------------------------------------------------------------")
+            print(f"** Executing test {target} on workflow {workflow}")
+            print(f"** -----------------------------------------------------------------------\n")
+
+            # Set environment variables
+            env = os.environ.copy()
+            env['TEST_TARGET'] = target
+            env['WORKFLOW'] = workflow
+            env['TEST_FLAGS'] = flags
+            env['TEARDOWN'] = str(teardown).lower()
+            env['TEST_LOGGING'] = 'True' if logging else 'False'
+            env['VGC_ENABLED'] = 'true' if vgc_enabled else 'false'
+            env['INFRA_NAMESPACE'] = 'default'
+            env['VOLTHA_NAMESPACE'] = 'voltha'
+            env['LOGS_DIR'] = f"{workspace}/logs/{target}"
+            env['EXTRA_HELM_FLAGS'] = "${{ inputs.extra-helm-flags }}"
+            env['LOG_LEVEL'] = "${{ inputs.log-level }}"
+            env['DOCKER_REGISTRY'] = "${{ inputs.docker-registry }}"
+            env['OLTS'] = "${{ inputs.olts }}"
+            env['WITH_MONITORING'] = "${{ inputs.with-monitoring }}"
+            env['ENABLE_MAC_LEARNING'] = "${{ inputs.enable-mac-learning }}"
+            env['EXTRA_ROBOT_ARGS'] = "${{ inputs.extra-robot-args }}"
+            env['BRANCH'] = "${{ inputs.branch }}"
+            env['GERRIT_PROJECT'] = "${{ inputs.gerrit-project }}"
+
+            # Create logs directory for this test
+            os.makedirs(env['LOGS_DIR'], exist_ok=True)
+
+            # Execute the test using the shell script
+            script_path = f"{action_dir}/execute_test.sh"
+
+            print(f"Running test script: {script_path}")
+
+            try:
+                result = subprocess.run(
+                    ['/bin/bash', script_path],
+                    env=env,
+                    check=True
+                )
+                print(f"\nTest {target} completed successfully\n")
+            except subprocess.CalledProcessError as e:
+                print(f"\nTest {target} failed with exit code {e.returncode}\n")
+                test_failures.append(target)
+                # Continue with other tests
+                continue
+            except Exception as e:
+                print(f"\nTest {target} failed with exception: {e}\n")
+                test_failures.append(target)
+                continue
+
+        if test_failures:
+            print(f"\n** Failed tests: {', '.join(test_failures)}")
+            sys.exit(1)
+        else:
+            print("\n** All tests passed successfully")
+
+        PYTHON_SCRIPT
+
+    # -----------------------------------------------------------------------
+    # Collect artifacts
+    # -----------------------------------------------------------------------
+    - name: Collect pod information
+      if: always()
+      shell: bash
+      run: |
+        echo "Collecting pod information..."
+        mkdir -p $GITHUB_WORKSPACE/logs/artifacts
+
+        kubectl get pods --all-namespaces -o wide > $GITHUB_WORKSPACE/logs/artifacts/pods.txt || true
+        kubectl get nodes -o wide > $GITHUB_WORKSPACE/logs/artifacts/nodes.txt || true
+        kubectl get events --all-namespaces --sort-by='.lastTimestamp' > $GITHUB_WORKSPACE/logs/artifacts/events.txt || true
+
+    - name: Collect VOLTHA logs
+      if: always()
+      shell: bash
+      run: |
+        echo "Collecting VOLTHA logs..."
+        kubectl logs -n voltha -l app.kubernetes.io/part-of=voltha \
+          > $GITHUB_WORKSPACE/logs/artifacts/voltha.log || true
+
+    - name: Cleanup port-forward processes
+      if: always()
+      shell: bash
+      run: |
+        echo "Cleaning up port-forward processes..."
+        pkill -f "kubectl.*port-forward" || true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: bbsim-test-results-${{ github.run_id }}
+        path: |
+          ${{ github.workspace }}/logs/**/*.log
+          ${{ github.workspace }}/logs/**/*.gz
+          ${{ github.workspace }}/logs/**/*.txt
+          ${{ github.workspace }}/logs/**/*.html
+          ${{ github.workspace }}/logs/**/*.xml
+          ${{ github.workspace }}/logs/**/voltha-pods-mem-consumption-*/*
+        retention-days: 30
+        if-no-files-found: warn
+
+    # -----------------------------------------------------------------------
+    # Cleanup
+    # -----------------------------------------------------------------------
+    - name: Delete kind cluster
+      if: always()
+      shell: bash
+      run: |
+        # Note: Cluster deletion is optional and can be controlled by workflow
+        echo "To delete cluster manually, run: kind delete cluster --name ${{ inputs.cluster-name }}"
