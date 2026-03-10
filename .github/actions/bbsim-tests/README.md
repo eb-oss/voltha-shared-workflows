@@ -35,7 +35,7 @@ The action performs the following steps:
 - **`log-level`**: Log level for VOLTHA components: DEBUG, INFO, WARN, ERROR (default: `"WARN"`)
 - **`timeout`**: Timeout in minutes for the entire action (default: `"240"`)
 - **`cluster-name`**: Name of the kind cluster (default: `"kind-ci"`)
-- **`docker-registry`**: Docker registry to use (default: `"mirror.registry.opennetworking.org"`)
+- **`docker-registry`**: Docker registry to use (default: `"linuxfoundation.jfrog.io/voltha-docker"`)
 - **`olts`**: Number of OLTs to simulate (default: `"1"`)
 - **`with-monitoring`**: Enable monitoring with Prometheus (default: `false`)
 - **`enable-mac-learning`**: Enable MAC learning in VOLTHA (default: `false`)

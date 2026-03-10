@@ -116,7 +116,7 @@ Set `log-level` to `DEBUG`:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
   with:
     branch: master
     log-level: DEBUG
@@ -130,7 +130,7 @@ Add `with-monitoring: true` to collect memory consumption metrics:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
   with:
     branch: master
     with-monitoring: true
@@ -144,7 +144,7 @@ Set the `olts` parameter:
 
 ```yaml
 - name: Run BBSim Tests
-  uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+  uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
   with:
     branch: master
     olts: "2"
@@ -192,7 +192,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run BBSim Tests
-        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ inputs.branch }}
           log-level: ${{ inputs.log_level }}
@@ -264,7 +264,7 @@ For production use, pin to a specific version:
 ```yaml
 uses: opencord/shared-workflows/.github/actions/bbsim-tests@v1.0.0  # Recommended
 uses: opencord/shared-workflows/.github/actions/bbsim-tests@abc123  # Most secure
-uses: opencord/shared-workflows/.github/actions/bbsim-tests@master  # Development only
+uses: opencord/shared-workflows/.github/actions/bbsim-tests@main  # Development only
 ```
 
 ## Next Steps
@@ -303,12 +303,12 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       
       - name: Run BBSim Tests
-        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
+        uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: master
           log-level: INFO
           cluster-name: kind-ci
-          docker-registry: mirror.registry.opennetworking.org
+          docker-registry: linuxfoundation.jfrog.io/voltha-docker
           olts: "2"
           with-monitoring: true
           enable-mac-learning: false

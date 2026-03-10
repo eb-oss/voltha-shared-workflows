@@ -58,7 +58,7 @@ inputs:
     description: "Docker registry to use"
     required: false
     type: string
-    default: "mirror.registry.opennetworking.org"
+    default: "linuxfoundation.jfrog.io/voltha-docker"
   olts:
     description: "Number of OLTs to simulate"
     required: false
@@ -359,7 +359,7 @@ runs:
         LOGS_DIR="${LOGS_DIR:-$GITHUB_WORKSPACE/logs}"
         EXTRA_HELM_FLAGS="${EXTRA_HELM_FLAGS:-}"
         LOG_LEVEL="${LOG_LEVEL:-WARN}"
-        DOCKER_REGISTRY="${DOCKER_REGISTRY:-mirror.registry.opennetworking.org}"
+        DOCKER_REGISTRY="${DOCKER_REGISTRY:-linuxfoundation.jfrog.io/voltha-docker}"
         OLTS="${OLTS:-1}"
         WITH_MONITORING="${WITH_MONITORING:-false}"
         ENABLE_MAC_LEARNING="${ENABLE_MAC_LEARNING:-false}"
