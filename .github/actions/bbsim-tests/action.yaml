@@ -475,23 +475,23 @@ runs:
                 helm dependency update "$GITHUB_WORKSPACE/voltha-helm-charts/voltha-infra" || true
                 helm dependency update "$GITHUB_WORKSPACE/voltha-helm-charts/voltha-stack" || true
                 helm install voltha-infra "$GITHUB_WORKSPACE/voltha-helm-charts/voltha-infra" \
-                    -n "$INFRA_NAMESPACE" --create-namespace --wait --timeout 20m
+                    -n "$INFRA_NAMESPACE" --create-namespace --wait --timeout 120m
                 helm install voltha "$GITHUB_WORKSPACE/voltha-helm-charts/voltha-stack" \
                     -n "$VOLTHA_NAMESPACE" --create-namespace \
                     --set global.stack_name=voltha \
                     --set global.voltha_infra_name=voltha-infra \
                     --set global.voltha_infra_namespace="$INFRA_NAMESPACE" \
-                    $(echo "$HELM_FLAGS") --wait --timeout 20m
+                    $(echo "$HELM_FLAGS") --wait --timeout 120m
             else
                 echo "Using charts from Helm repository"
                 helm install voltha-infra onf/voltha-infra \
-                    -n "$INFRA_NAMESPACE" --create-namespace --wait --timeout 20m
+                    -n "$INFRA_NAMESPACE" --create-namespace --wait --timeout 120m
                 helm install voltha onf/voltha-stack \
                     -n "$VOLTHA_NAMESPACE" --create-namespace \
                     --set global.stack_name=voltha \
                     --set global.voltha_infra_name=voltha-infra \
                     --set global.voltha_infra_namespace="$INFRA_NAMESPACE" \
-                    $(echo "$HELM_FLAGS") --wait --timeout 20m
+                    $(echo "$HELM_FLAGS") --wait --timeout 120m
             fi
 
             for i in $(seq 0 $((OLTS - 1))); do
