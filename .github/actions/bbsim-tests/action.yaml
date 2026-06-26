@@ -9,75 +9,52 @@ inputs:
   branch:
     description: "Branch to test (master, voltha-2.15, etc.)"
     required: true
-    type: string
   test-targets:
     description: "YAML string defining test targets to run"
     required: true
-    type: string
   gerrit-project:
     description: "Gerrit project name if building a patch"
     required: false
-    type: string
     default: ""
   gerrit-refspec:
     description: "Gerrit refspec if building a patch"
     required: false
-    type: string
-    default: ""
-  voltha-system-tests-change:
-    description: "Gerrit change number for voltha-system-tests"
-    required: false
-    type: string
-    default: ""
-  voltha-helm-charts-change:
-    description: "Gerrit change number for voltha-helm-charts"
-    required: false
-    type: string
     default: ""
   extra-helm-flags:
     description: "Additional Helm flags for deployment"
     required: false
-    type: string
     default: ""
   log-level:
     description: "Log level for VOLTHA components (DEBUG, INFO, WARN, ERROR)"
     required: false
-    type: string
     default: "WARN"
   timeout:
     description: "Timeout in minutes for the entire action"
     required: false
-    type: string
     default: "240"
   cluster-name:
     description: "Name of the kind cluster"
     required: false
-    type: string
     default: "kind-ci"
   docker-registry:
     description: "Docker registry to use"
     required: false
-    type: string
     default: "linuxfoundation.jfrog.io/voltha-docker"
   olts:
     description: "Number of OLTs to simulate"
     required: false
-    type: string
     default: "1"
   with-monitoring:
     description: "Enable monitoring with prometheus"
     required: false
-    type: boolean
-    default: false
+    default: "false"
   enable-mac-learning:
     description: "Enable MAC learning in VOLTHA"
     required: false
-    type: boolean
-    default: false
+    default: "false"
   extra-robot-args:
     description: "Additional arguments for Robot Framework"
     required: false
-    type: string
     default: ""
 
 outputs:
@@ -205,32 +182,12 @@ runs:
         ref: ${{ inputs.branch }}
         path: voltha-system-tests
 
-    - name: Apply voltha-system-tests patch
-      if: inputs.voltha-system-tests-change != ''
-      shell: bash
-      working-directory: voltha-system-tests
-      run: |
-        echo "Applying voltha-system-tests change ${{ inputs.voltha-system-tests-change }}"
-        git fetch https://gerrit.lfbroadband.org/voltha-system-tests \
-          refs/changes/${{ inputs.voltha-system-tests-change }}
-        git checkout FETCH_HEAD
-
     - name: Checkout voltha-helm-charts
       uses: actions/checkout@v4
       with:
         repository: opencord/voltha-helm-charts
         ref: ${{ inputs.branch }}
         path: voltha-helm-charts
-
-    - name: Apply voltha-helm-charts patch
-      if: inputs.voltha-helm-charts-change != ''
-      shell: bash
-      working-directory: voltha-helm-charts
-      run: |
-        echo "Applying voltha-helm-charts change ${{ inputs.voltha-helm-charts-change }}"
-        git fetch https://gerrit.lfbroadband.org/voltha-helm-charts \
-          refs/changes/${{ inputs.voltha-helm-charts-change }}
-        git checkout FETCH_HEAD
 
     # -----------------------------------------------------------------------
     # Checkout and build gerrit project if specified

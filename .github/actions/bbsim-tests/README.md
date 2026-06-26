@@ -29,8 +29,6 @@ The action performs the following steps:
 
 - **`gerrit-project`**: Gerrit project name if building a patch (default: `""`)
 - **`gerrit-refspec`**: Gerrit refspec if building a patch (default: `""`)
-- **`voltha-system-tests-change`**: Gerrit change number for voltha-system-tests (default: `""`)
-- **`voltha-helm-charts-change`**: Gerrit change number for voltha-helm-charts (default: `""`)
 - **`extra-helm-flags`**: Additional Helm flags for deployment (default: `""`)
 - **`log-level`**: Log level for VOLTHA components: DEBUG, INFO, WARN, ERROR (default: `"WARN"`)
 - **`timeout`**: Timeout in minutes for the entire action (default: `"240"`)
@@ -217,34 +215,6 @@ jobs:
               vgcEnabled: false
 ```
 
-### Testing with voltha-system-tests Changes
-
-```yaml
-name: Test System Tests Changes
-
-on:
-  pull_request:
-    paths:
-      - 'tests/**'
-
-jobs:
-  test-changes:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run BBSim Tests
-        uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
-        with:
-          branch: master
-          voltha-system-tests-change: "refs/changes/12/34512/1"
-          test-targets: |
-            - target: functional-single-kind-dt
-              workflow: dt
-              flags: ""
-              teardown: true
-              logging: true
-              vgcEnabled: false
-```
-
 ## How It Works
 
 This action is implemented as a **composite action** with all logic embedded directly in the `action.yaml` file. When called from an external repository:
@@ -366,8 +336,6 @@ This action replaces the Jenkins pipeline `bbsim-tests.groovy`. Key differences:
 | `testTargets` | `test-targets` |
 | `gerritProject` | `gerrit-project` |
 | `gerritRefspec` | `gerrit-refspec` |
-| `volthaSystemTestsChange` | `voltha-system-tests-change` |
-| `volthaHelmChartsChange` | `voltha-helm-charts-change` |
 | `extraHelmFlags` | `extra-helm-flags` |
 | `logLevel` | `log-level` |
 | `timeout` | `timeout` |
