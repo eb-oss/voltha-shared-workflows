@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 name: Gerrit Verify - Unit Tests
-# Requires a go.mod file to be present in the repo
 
 # yamllint disable-line rule:truthy
 on:
@@ -115,6 +114,7 @@ jobs:
       - name: Install virtualenv
         run: pip install virtualenv
       - name: Install Go
+        if: ${{ hashFiles('go.mod') != '' }}
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
