@@ -1,5 +1,0 @@
-[gerrit]
-host=gerrit.lfbroadband.org
-port=29418
-project=shared-workflows.git
-defaultbranch=main

@@ -7,16 +7,16 @@ name: Sanity Test
 on:
   workflow_call:
     inputs:
-      GERRIT_BRANCH:
+      BRANCH:
         description: "Branch that change is against"
         required: true
         type: string
-      GERRIT_PROJECT:
-        description: "Project in Gerrit"
+      PROJECT:
+        description: "Project on Github"
         required: true
         type: string
-      GERRIT_REFSPEC:
-        description: "Gerrit refspec of change"
+      REFSPEC:
+        description: "Refspec of change"
         required: true
         type: string
       EC2_INSTANCE_TYPE:
@@ -80,9 +80,6 @@ on:
         type: string
         default: ""
     secrets:
-      GERRIT_SSH_PRIVKEY:
-        description: "SSH Key for the authorized user account"
-        required: true
       AWS_ACCESS_KEY_ID:
         description: "AWS access key ID"
         required: true
@@ -134,10 +131,10 @@ jobs:
       - name: Run Sanity Tests
         uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
-          branch: ${{ inputs.GERRIT_BRANCH }}
+          branch: ${{ inputs.BRANCH }}
           test-targets: ${{ inputs.TEST_TARGETS }}
-          gerrit-project: ${{ inputs.GERRIT_PROJECT }}
-          gerrit-refspec: ${{ inputs.GERRIT_REFSPEC }}
+          gerrit-project: ${{ inputs.PROJECT }}
+          gerrit-refspec: ${{ inputs.REFSPEC }}
           extra-helm-flags: ${{ inputs.EXTRA_HELM_FLAGS }}
           log-level: ${{ inputs.LOG_LEVEL }}
           timeout: ${{ inputs.TIMEOUT }}
