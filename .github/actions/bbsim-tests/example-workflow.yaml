@@ -271,17 +271,17 @@ jobs:
           retention-days: 30
 
   # -----------------------------------------------------------------------
-  # Job: Test Gerrit Patch
+  # Job: Test Patch
   # -----------------------------------------------------------------------
   test-patch:
-    name: Test Gerrit Patch
+    name: Test Patch
     runs-on: ubuntu-latest
     timeout-minutes: 240
     # Only run when triggered manually with patch information
     if: |
       github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.gerrit_project != '' &&
-      github.event.inputs.gerrit_refspec != ''
+      github.event.inputs.project != '' &&
+      github.event.inputs.refspec != ''
 
     steps:
       - name: Free up disk space
@@ -295,8 +295,8 @@ jobs:
         uses: opencord/shared-workflows/.github/actions/bbsim-tests@main
         with:
           branch: ${{ github.event.inputs.branch || 'master' }}
-          gerrit-project: ${{ github.event.inputs.gerrit_project }}
-          gerrit-refspec: ${{ github.event.inputs.gerrit_refspec }}
+          project: ${{ github.event.inputs.project }}
+          refspec: ${{ github.event.inputs.refspec }}
           log-level: DEBUG
           test-targets: |
             - target: sanity-single-kind

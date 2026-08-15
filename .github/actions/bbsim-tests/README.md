@@ -12,7 +12,7 @@ The action performs the following steps:
 
 1. **Setup Environment**: Installs all required dependencies (kubectl, helm, kind, kail, voltctl)
 2. **Checkout Repositories**: Clones voltha-system-tests and voltha-helm-charts
-3. **Build Components**: Optionally builds VOLTHA components from Gerrit patches
+3. **Build Components**: Optionally builds VOLTHA components from a project patch
 4. **Create Kubernetes Cluster**: Sets up a kind cluster for testing
 5. **Deploy Infrastructure**: Deploys VOLTHA, ONOS, and BBSim instances
 6. **Run Tests**: Executes Robot Framework test suites
@@ -27,8 +27,8 @@ The action performs the following steps:
 
 ### Optional Inputs
 
-- **`gerrit-project`**: Gerrit project name if building a patch (default: `""`)
-- **`gerrit-refspec`**: Gerrit refspec if building a patch (default: `""`)
+- **`project`**: Project (repository) name if building a patch (default: `""`)
+- **`refspec`**: Refspec of the change if building a patch (default: `""`)
 - **`extra-helm-flags`**: Additional Helm flags for deployment (default: `""`)
 - **`log-level`**: Log level for VOLTHA components: DEBUG, INFO, WARN, ERROR (default: `"WARN"`)
 - **`timeout`**: Timeout in minutes for the entire action (default: `"240"`)
@@ -179,20 +179,20 @@ jobs:
           path: logs/
 ```
 
-### Testing a Gerrit Patch
+### Testing a Patch
 
 ```yaml
-name: Test Gerrit Patch
+name: Test Patch
 
 on:
   workflow_dispatch:
     inputs:
-      gerrit_project:
-        description: 'Gerrit project name'
+      project:
+        description: 'Project (repository) name'
         required: true
         type: string
-      gerrit_refspec:
-        description: 'Gerrit refspec'
+      refspec:
+        description: 'Refspec of the change'
         required: true
         type: string
 
@@ -204,8 +204,8 @@ jobs:
         uses: opencord/shared-workflows/.github/actions/bbsim-tests@master
         with:
           branch: master
-          gerrit-project: ${{ inputs.gerrit_project }}
-          gerrit-refspec: ${{ inputs.gerrit_refspec }}
+          project: ${{ inputs.project }}
+          refspec: ${{ inputs.refspec }}
           test-targets: |
             - target: sanity-single-kind
               workflow: dt
@@ -334,8 +334,8 @@ This action replaces the Jenkins pipeline `bbsim-tests.groovy`. Key differences:
 |------------------|---------------------|
 | `branch` | `branch` |
 | `testTargets` | `test-targets` |
-| `gerritProject` | `gerrit-project` |
-| `gerritRefspec` | `gerrit-refspec` |
+| `gerritProject` | `project` |
+| `gerritRefspec` | `refspec` |
 | `extraHelmFlags` | `extra-helm-flags` |
 | `logLevel` | `log-level` |
 | `timeout` | `timeout` |
