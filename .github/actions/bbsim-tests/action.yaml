@@ -12,12 +12,12 @@ inputs:
   test-targets:
     description: "YAML string defining test targets to run"
     required: true
-  gerrit-project:
-    description: "Gerrit project name if building a patch"
+  project:
+    description: "Project (repository) name if building a patch"
     required: false
     default: ""
-  gerrit-refspec:
-    description: "Gerrit refspec if building a patch"
+  refspec:
+    description: "Refspec of the change if building a patch"
     required: false
     default: ""
   extra-helm-flags:
@@ -163,7 +163,7 @@ runs:
       shell: bash
       run: |
         echo "Installing voltctl..."
-        if [ "${{ inputs.gerrit-project }}" != "voltctl" ]; then
+        if [ "${{ inputs.project }}" != "voltctl" ]; then
           if [ ! -f "$GITHUB_WORKSPACE/bin/voltctl" ]; then
             VOLTCTL_VERSION="1.8.45"
             curl -Lo "$GITHUB_WORKSPACE/bin/voltctl" \
@@ -190,28 +190,28 @@ runs:
         path: voltha-helm-charts
 
     # -----------------------------------------------------------------------
-    # Checkout and build gerrit project if specified
+    # Checkout and build project if specified
     # -----------------------------------------------------------------------
-    - name: Checkout gerrit project
-      if: inputs.gerrit-project != ''
+    - name: Checkout project
+      if: inputs.project != ''
       uses: actions/checkout@v4
       with:
-        repository: opencord/${{ inputs.gerrit-project }}
-        ref: ${{ inputs.gerrit-refspec }}
-        path: ${{ inputs.gerrit-project }}
+        repository: opencord/${{ inputs.project }}
+        ref: ${{ inputs.refspec }}
+        path: ${{ inputs.project }}
 
-    - name: Build gerrit project
-      if: inputs.gerrit-project != ''
+    - name: Build project
+      if: inputs.project != ''
       shell: bash
-      working-directory: ${{ inputs.gerrit-project }}
+      working-directory: ${{ inputs.project }}
       run: |
-        echo "Building ${{ inputs.gerrit-project }}..."
+        echo "Building ${{ inputs.project }}..."
         if [ -f "Makefile" ]; then
           make docker-build
         fi
 
     - name: Build and install voltctl from source
-      if: inputs.gerrit-project == 'voltctl'
+      if: inputs.project == 'voltctl'
       shell: bash
       working-directory: voltctl
       run: |
@@ -260,11 +260,11 @@ runs:
     # Load images to kind if building a component
     # -----------------------------------------------------------------------
     - name: Load images to kind
-      if: inputs.gerrit-project != '' && inputs.gerrit-project != 'voltctl'
+      if: inputs.project != '' && inputs.project != 'voltctl'
       shell: bash
       run: |
         echo "Loading images to kind cluster..."
-        PROJECT="${{ inputs.gerrit-project }}"
+        PROJECT="${{ inputs.project }}"
         IMAGE_NAME="${PROJECT//-/_}"
 
         # Find the built image
@@ -322,7 +322,7 @@ runs:
         ENABLE_MAC_LEARNING="${ENABLE_MAC_LEARNING:-false}"
         EXTRA_ROBOT_ARGS="${EXTRA_ROBOT_ARGS:-}"
         BRANCH="${BRANCH:-master}"
-        GERRIT_PROJECT="${GERRIT_PROJECT:-}"
+        PROJECT="${PROJECT:-}"
 
         # Helper functions
         banner() {
@@ -403,9 +403,9 @@ runs:
                 HELM_FLAGS="$HELM_FLAGS $TEST_FLAGS"
             fi
 
-            if [ -n "$GERRIT_PROJECT" ] && [ "$GERRIT_PROJECT" != "voltctl" ]; then
+            if [ -n "$PROJECT" ] && [ "$PROJECT" != "voltctl" ]; then
                 IMAGE_TAG="citest"
-                case "$GERRIT_PROJECT" in
+                case "$PROJECT" in
                     voltha-go)
                         HELM_FLAGS="$HELM_FLAGS --set voltha.image.tag=$IMAGE_TAG"
                         ;;
@@ -601,7 +601,7 @@ runs:
             env['ENABLE_MAC_LEARNING'] = "${{ inputs.enable-mac-learning }}"
             env['EXTRA_ROBOT_ARGS'] = "${{ inputs.extra-robot-args }}"
             env['BRANCH'] = "${{ inputs.branch }}"
-            env['GERRIT_PROJECT'] = "${{ inputs.gerrit-project }}"
+            env['PROJECT'] = "${{ inputs.project }}"
 
             # Create logs directory for this test
             os.makedirs(env['LOGS_DIR'], exist_ok=True)

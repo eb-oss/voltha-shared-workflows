@@ -96,7 +96,7 @@ When the action runs, it automatically checks out these repositories into the ru
 
 1. **voltha-system-tests** - Contains the Robot Framework test suites
 2. **voltha-helm-charts** - Contains Helm charts for deployment (if using patches or release branches)
-3. **gerrit-project** (optional) - If testing a specific component patch
+3. **project** (optional) - If testing a specific component patch
 
 The calling repository is **not** automatically checked out. If you need files from your repository, add a checkout step:
 
@@ -125,7 +125,7 @@ When the action runs, the file system looks like this:
     ├── <calling-repo-name>/        (only if explicitly checked out)
     ├── voltha-system-tests/        (checked out by action)
     ├── voltha-helm-charts/         (checked out by action, if needed)
-    ├── <gerrit-project>/           (checked out by action, if specified)
+    ├── <project>/                  (checked out by action, if specified)
     ├── bin/                        (created by action for tools)
     ├── logs/                       (created by action for test results)
     └── tmp/
@@ -173,7 +173,7 @@ All test-specific variables are passed to the execution script via environment.
 **Solutions**:
 1. This should not happen - the action checks out the repository automatically
 2. If it does occur, check the action's checkout step logs
-3. Verify network connectivity to GitHub/Gerrit
+3. Verify network connectivity to GitHub
 
 ## Version Pinning
 

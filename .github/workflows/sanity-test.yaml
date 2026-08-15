@@ -133,8 +133,8 @@ jobs:
         with:
           branch: ${{ inputs.BRANCH }}
           test-targets: ${{ inputs.TEST_TARGETS }}
-          gerrit-project: ${{ inputs.PROJECT }}
-          gerrit-refspec: ${{ inputs.REFSPEC }}
+          project: ${{ inputs.PROJECT }}
+          refspec: ${{ inputs.REFSPEC }}
           extra-helm-flags: ${{ inputs.EXTRA_HELM_FLAGS }}
           log-level: ${{ inputs.LOG_LEVEL }}
           timeout: ${{ inputs.TIMEOUT }}
