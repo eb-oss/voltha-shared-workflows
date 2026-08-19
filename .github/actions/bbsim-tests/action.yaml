@@ -13,11 +13,18 @@ inputs:
     description: "YAML string defining test targets to run"
     required: true
   project:
-    description: "Project (repository) name if building a patch"
+    description: >-
+      Project (repository) name of the code under test. Defaults to the
+      repository running the workflow. Set to "" to skip building a patch and
+      test released images only.
     required: false
-    default: ""
+    default: ${{ github.event.repository.name }}
   refspec:
-    description: "Refspec of the change if building a patch"
+    description: >-
+      Ref of the code under test, resolved against opencord/<project>: a branch,
+      tag, full SHA, or refs/pull/<N>/head. The refs/pull form reaches the head
+      of an open PR, including PRs raised from forks, without needing to trust
+      the fork repository itself. Required whenever `project` is non-empty.
     required: false
     default: ""
   extra-helm-flags:
@@ -192,6 +199,15 @@ runs:
     # -----------------------------------------------------------------------
     # Checkout and build project if specified
     # -----------------------------------------------------------------------
+    - name: Validate refspec
+      if: inputs.project != '' && inputs.refspec == ''
+      shell: bash
+      run: |
+        echo "::error::'refspec' is empty while 'project' is '${{ inputs.project }}'."
+        echo "Refusing to run: an empty refspec silently checks out the default"
+        echo "branch, which would report a pass without testing your code."
+        exit 1
+
     - name: Checkout project
       if: inputs.project != ''
       uses: actions/checkout@v4
@@ -204,11 +220,20 @@ runs:
       if: inputs.project != ''
       shell: bash
       working-directory: ${{ inputs.project }}
+      env:
+        # Pin the image coordinates so the load-to-kind and Helm --set steps
+        # below can find the built artifacts deterministically.
+        DOCKER_REPOSITORY: "voltha/"
+        DOCKER_TAG: "citest"
       run: |
-        echo "Building ${{ inputs.project }}..."
-        if [ -f "Makefile" ]; then
-          make docker-build
+        set -euo pipefail
+        echo "Building ${{ inputs.project }} at ref '${{ inputs.refspec }}'"
+        echo "Commit under test: $(git rev-parse HEAD)"
+        if [ ! -f "Makefile" ]; then
+          echo "::error::No Makefile found in ${{ inputs.project }}; cannot build the code under test"
+          exit 1
         fi
+        make docker-build
 
     - name: Build and install voltctl from source
       if: inputs.project == 'voltctl'
@@ -263,19 +288,24 @@ runs:
       if: inputs.project != '' && inputs.project != 'voltctl'
       shell: bash
       run: |
+        set -euo pipefail
         echo "Loading images to kind cluster..."
-        PROJECT="${{ inputs.project }}"
-        IMAGE_NAME="${PROJECT//-/_}"
 
-        # Find the built image
-        IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "voltha/${PROJECT}|opencord/${PROJECT}" | head -1)
+        mapfile -t IMAGES < <(docker images --format '{{.Repository}}:{{.Tag}}' \
+          --filter 'reference=voltha/*:citest')
 
-        if [ -n "$IMAGE" ]; then
+        if [ "${#IMAGES[@]}" -eq 0 ]; then
+          echo "::error::Building ${{ inputs.project }} produced no voltha/*:citest images."
+          echo "Without them the cluster would silently run released images instead"
+          echo "of the code under test. Images present on this runner:"
+          docker images --format '  {{.Repository}}:{{.Tag}}'
+          exit 1
+        fi
+
+        for IMAGE in "${IMAGES[@]}"; do
           echo "Loading image: $IMAGE"
           kind load docker-image "$IMAGE" --name ${{ inputs.cluster-name }}
-        else
-          echo "Warning: No image found for project $PROJECT"
-        fi
+        done
 
     # -----------------------------------------------------------------------
     # Setup Helm repositories
@@ -322,7 +352,7 @@ runs:
         ENABLE_MAC_LEARNING="${ENABLE_MAC_LEARNING:-false}"
         EXTRA_ROBOT_ARGS="${EXTRA_ROBOT_ARGS:-}"
         BRANCH="${BRANCH:-master}"
-        PROJECT="${PROJECT:-}"
+        GERRIT_PROJECT="${GERRIT_PROJECT:-}"
 
         # Helper functions
         banner() {
@@ -390,6 +420,7 @@ runs:
             fi
 
             HELM_FLAGS="--set global.log_level=${LOG_LEVEL^^}"
+            BBSIM_FLAGS=""
             if [ "$VGC_ENABLED" != "true" ]; then
                 HELM_FLAGS="$HELM_FLAGS --set onos-classic.onosSshPort=30115"
                 HELM_FLAGS="$HELM_FLAGS --set onos-classic.onosApiPort=30120"
@@ -403,23 +434,41 @@ runs:
                 HELM_FLAGS="$HELM_FLAGS $TEST_FLAGS"
             fi
 
-            if [ -n "$PROJECT" ] && [ "$PROJECT" != "voltctl" ]; then
+            if [ -n "$GERRIT_PROJECT" ] && [ "$GERRIT_PROJECT" != "voltctl" ]; then
                 IMAGE_TAG="citest"
-                case "$PROJECT" in
+                # The citest image is loaded straight into kind and exists in no
+                # registry, so the chart default of pullPolicy=Always would send
+                # every pod into ImagePullBackOff.
+                HELM_FLAGS="$HELM_FLAGS --set global.image_pullPolicy=IfNotPresent"
+                # Key paths are <subchart>.images.<component>.tag as defined in
+                # voltha-helm-charts; setting them explicitly also takes
+                # precedence over any global.image_tag in EXTRA_HELM_FLAGS.
+                case "$GERRIT_PROJECT" in
                     voltha-go)
-                        HELM_FLAGS="$HELM_FLAGS --set voltha.image.tag=$IMAGE_TAG"
-                        ;;
-                    voltha-openolt-adapter)
-                        HELM_FLAGS="$HELM_FLAGS --set voltha-adapter-openolt.image.tag=$IMAGE_TAG"
-                        ;;
-                    voltha-openonu-adapter-go)
-                        HELM_FLAGS="$HELM_FLAGS --set voltha-adapter-openonu.image.tag=$IMAGE_TAG"
+                        HELM_FLAGS="$HELM_FLAGS --set voltha.images.rw_core.tag=$IMAGE_TAG"
                         ;;
                     ofagent-go)
-                        HELM_FLAGS="$HELM_FLAGS --set voltha.ofagent.image.tag=$IMAGE_TAG"
+                        HELM_FLAGS="$HELM_FLAGS --set voltha.images.ofagent.tag=$IMAGE_TAG"
+                        ;;
+                    voltha-openolt-adapter)
+                        HELM_FLAGS="$HELM_FLAGS --set voltha-adapter-openolt.images.adapter_open_olt.tag=$IMAGE_TAG"
+                        ;;
+                    voltha-openonu-adapter-go)
+                        HELM_FLAGS="$HELM_FLAGS --set voltha-adapter-openonu.images.adapter_open_onu_go.tag=$IMAGE_TAG"
+                        ;;
+                    voltha-go-controller)
+                        HELM_FLAGS="$HELM_FLAGS --set voltha-go-controller.images.voltha_go_controller.tag=$IMAGE_TAG"
                         ;;
                     bbsim)
-                        HELM_FLAGS="$HELM_FLAGS --set bbsim.image.tag=$IMAGE_TAG"
+                        # bbsim is its own Helm release, not part of voltha-stack.
+                        BBSIM_FLAGS="$BBSIM_FLAGS --set images.bbsim.tag=$IMAGE_TAG"
+                        BBSIM_FLAGS="$BBSIM_FLAGS --set global.image_pullPolicy=IfNotPresent"
+                        ;;
+                    *)
+                        echo "::error::No Helm image-tag mapping for project '$GERRIT_PROJECT'."
+                        echo "The built citest image would be ignored and the test"
+                        echo "would run released images instead. Add a case entry."
+                        exit 1
                         ;;
                 esac
             fi
@@ -455,10 +504,12 @@ runs:
                 echo "Deploying bbsim${i}..."
                 if [ "$LOCAL_CHARTS" = "true" ]; then
                     helm install "bbsim${i}" "$GITHUB_WORKSPACE/voltha-helm-charts/bbsim" \
-                        -n "$VOLTHA_NAMESPACE" --set olt_id="${i}" --wait || true
+                        -n "$VOLTHA_NAMESPACE" --set olt_id="${i}" \
+                        $(echo "$BBSIM_FLAGS") --wait
                 else
                     helm install "bbsim${i}" onf/bbsim \
-                        -n "$VOLTHA_NAMESPACE" --set olt_id="${i}" --wait || true
+                        -n "$VOLTHA_NAMESPACE" --set olt_id="${i}" \
+                        $(echo "$BBSIM_FLAGS") --wait
                 fi
             done
 
@@ -601,7 +652,7 @@ runs:
             env['ENABLE_MAC_LEARNING'] = "${{ inputs.enable-mac-learning }}"
             env['EXTRA_ROBOT_ARGS'] = "${{ inputs.extra-robot-args }}"
             env['BRANCH'] = "${{ inputs.branch }}"
-            env['PROJECT'] = "${{ inputs.project }}"
+            env['GERRIT_PROJECT'] = "${{ inputs.project }}"
 
             # Create logs directory for this test
             os.makedirs(env['LOGS_DIR'], exist_ok=True)

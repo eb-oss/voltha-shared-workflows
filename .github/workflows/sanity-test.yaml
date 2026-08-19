@@ -8,17 +8,21 @@ on:
   workflow_call:
     inputs:
       BRANCH:
-        description: "Branch that change is against"
-        required: true
-        type: string
-      PROJECT:
-        description: "Project on Github"
+        description: >-
+          VOLTHA release train used to check out voltha-system-tests and
+          voltha-helm-charts (master, voltha-2.15, ...). This is NOT the ref of
+          the code under test; use REFSPEC for that.
         required: true
         type: string
       REFSPEC:
-        description: "Refspec of change"
-        required: true
+        description: >-
+          Ref of the code under test, resolved against the opencord repository:
+          a branch, tag, full SHA, or refs/pull/<N>/head. The refs/pull form
+          reaches the head of an open PR, including PRs raised from forks.
+          Defaults to the SHA of the calling workflow run.
+        required: false
         type: string
+        default: ""
       EC2_INSTANCE_TYPE:
         description: "EC2 instance type"
         required: false
@@ -133,8 +137,7 @@ jobs:
         with:
           branch: ${{ inputs.BRANCH }}
           test-targets: ${{ inputs.TEST_TARGETS }}
-          project: ${{ inputs.PROJECT }}
-          refspec: ${{ inputs.REFSPEC }}
+          refspec: ${{ inputs.REFSPEC != '' && inputs.REFSPEC || github.sha }}
           extra-helm-flags: ${{ inputs.EXTRA_HELM_FLAGS }}
           log-level: ${{ inputs.LOG_LEVEL }}
           timeout: ${{ inputs.TIMEOUT }}
